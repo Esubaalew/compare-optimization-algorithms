@@ -1,0 +1,393 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- PACKAGES ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern} % A more modern-looking font
+\usepackage{amsmath, amssymb, amsfonts} % Math symbols
+\usepackage{graphicx} % For including images (plots)
+\usepackage[table]{xcolor} % For colored table cells/rows if needed
+\usepackage{booktabs} % For professional quality tables
+\usepackage{longtable} % For tables that might span multiple pages
+\usepackage{geometry} % For page layout
+\usepackage{hyperref} % For clickable links (e.g., in TOC, references)
+\usepackage{titlesec} % For customizing section titles
+\usepackage{enumitem} % For customizing lists
+\usepackage{caption} % For better caption control
+\usepackage{float} % For better figure placement control (e.g., [H])
+\usepackage{fancyhdr} % For headers and footers (optional)
+\usepackage{array} % For more complex table column specifications
+
+% --- PAGE GEOMETRY ---
+\geometry{
+    a4paper,
+    total={170mm,257mm},
+    left=20mm,
+    top=20mm,
+    right=20mm,
+    bottom=20mm,
+    headheight=15pt
+}
+
+% --- HYPERREF SETUP ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black, % Color of internal links
+    citecolor=green!50!black, % Color of citations
+    urlcolor=magenta!80!black,  % Color of external links (URLs)
+    pdftitle={Optimizer Performance Comparison on EuroSAT},
+    pdfauthor={Your Name}, % Change this
+    pdfsubject={Deep Learning Assignment},
+    pdfkeywords={Deep Learning, Optimizers, EuroSAT, MLP, TensorFlow},
+    bookmarksnumbered=true,
+    breaklinks=true
+}
+
+% --- SECTION TITLE STYLING ("Cooler Look") ---
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{blue!60!black}} % Section title color and style
+  {\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{blue!50!black}} % Subsection title color and style
+  {\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\bfseries\color{blue!40!black}} % Subsubsection title color and style
+  {\thesubsubsection}{1em}{}
+
+% --- CAPTION STYLING ---
+\captionsetup{font=small,labelfont=bf,labelsep=period}
+
+% --- DOCUMENT TITLE ---
+\title{
+    \vspace{-1cm} % Adjust vertical space if needed
+    \includegraphics[width=0.3\textwidth]{logo.png} \\ % Optional: Add a logo. Create a placeholder_logo.png or remove
+    \vspace{0.5cm}
+    \textbf{\Huge Performance Comparison of Optimization Algorithms \\ on the EuroSAT Dataset}
+}
+\author{Esubalew Chekol & Tensaye Aschalew \\ GSR/6451/17 & ?? \\ Deep Learning} % Customize this
+\date{\today}
+
+% --- START DOCUMENT ---
+\begin{document}
+
+\maketitle
+\thispagestyle{empty} % No header/footer on title page
+\clearpage
+
+\tableofcontents % Add a table of contents
+\clearpage
+
+% --- SECTION 1: INTRODUCTION ---
+\section{Introduction}
+\subsection{Problem}
+This project addresses the task of land use and land cover classification using satellite imagery from the EuroSAT dataset. The dataset comprises 10 distinct classes of 64x64 pixel RGB images.
+
+\subsection{Objective}
+The primary objective is to empirically compare the performance of eight different optimization algorithm setups. This comparison is conducted by training a simple Multi-Layer Perceptron (MLP) neural network on the EuroSAT dataset with each optimizer.
+
+\subsection{Metrics}
+The performance of each optimizer is evaluated based on:
+\begin{itemize}
+    \item Test Accuracy
+    \item Test F1-score (weighted, to account for potential class imbalances or varying class difficulties)
+    \item Total Training Time
+\end{itemize}
+
+% --- SECTION 2: EXPERIMENTAL SETUP ---
+\section{Experimental Setup}
+\subsection{Dataset}
+The EuroSAT dataset (RGB version) was utilized. It was loaded via \texttt{tensorflow\_datasets} (\texttt{eurosat/rgb}). The dataset was split into 80\% for training (21,600 samples) and 20\% for testing (5,400 samples).
+\begin{itemize}
+    \item Number of classes: 10
+    \item Class names: \texttt{['AnnualCrop', 'Forest', 'HerbaceousVegetation', 'Highway', 'Industrial', 'Pasture', 'PermanentCrop', 'Residential', 'River', 'SeaLake']}
+\end{itemize}
+
+\subsection{Preprocessing}
+\begin{itemize}
+    \item Pixel values of the images were normalized from the $[0, 255]$ range to the $[0, 1]$ range by dividing by 255.0.
+    \item Target labels were one-hot encoded to suit the \texttt{categorical\_crossentropy} loss function.
+\end{itemize}
+
+\subsection{Neural Network Architecture (Simple MLP)}
+A consistent MLP architecture was used for all experiments:
+\begin{itemize}
+    \item Input Layer: Takes flattened image data (64x64x3 = 12288 features).
+        \begin{itemize}
+            \item \texttt{Input(shape=(64, 64, 3))}
+            \item \texttt{Flatten()}
+        \end{itemize}
+    \item Hidden Layer 1: \texttt{Dense(128, activation='relu', kernel\_initializer='he\_normal')}
+    \item Hidden Layer 2: \texttt{Dense(64, activation='relu', kernel\_initializer='he\_normal')}
+    \item Output Layer: \texttt{Dense(10, activation='softmax')} (for 10 classes)
+\end{itemize}
+Total Parameters: 1,581,898 (all trainable).
+
+\subsection{Common Training Parameters}
+\begin{itemize}
+    \item Epochs: 15 for all experiments.
+    \item Base Learning Rate: 0.01 (used for SGD variants and as the initial learning rate for adaptive optimizers).
+    \item Momentum Value (for momentum-based optimizers): 0.9.
+    \item Hardware: Training was performed on an environment with 2 GPUs available to TensorFlow (Version 2.18.0).
+\end{itemize}
+
+\subsection{Optimizer-Specific Batch Sizes}
+\begin{itemize}
+    \item \textbf{GD (Batch) \& its Momentum Variants:} Full training set (21,600 samples).
+    \item \textbf{Minibatch SGD \& Adaptive Optimizers (AdaGrad, RMSprop, Adam):} 32 (managed via \texttt{tf.data.Dataset} batching).
+    \item \textbf{Stochastic GD:} 1.
+\end{itemize}
+
+% --- SECTION 3: RESULTS & DISCUSSION ---
+\section{Results and Discussion}
+The performance of the optimizers was evaluated based on their test accuracy, F1 score, and training time.
+
+\subsection{Overall Performance Summary}
+The following table summarizes the overall performance of all tested optimizers, sorted by F1 Score.
+
+% The main results table (copy from your report)
+\begin{table}[H]
+    \centering
+    \caption{Overall Performance Summary of Optimizers (Sorted by F1 Score)}
+    \label{tab:overall_summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        Optimizer                       & Batch Size Config        & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        Minibatch SGD                 & 32 (tf.data configured)  & 0.5654   & 0.5551   & 30.73             \\
+        AdaGrad                         & 32 (tf.data configured)  & 0.4828   & 0.4680   & 30.98             \\
+        Adam                            & 32 (tf.data configured)  & 0.4509   & 0.4113   & 32.85             \\
+        GD with Momentum (Batch)        & 21600                    & 0.2735   & 0.2089   & 28.19             \\
+        GD with Nesterov Momentum (Batch) & 21600                    & 0.2419   & 0.1490   & 28.03             \\
+        GD (Batch)                      & 21600                    & 0.2056   & 0.1083   & 27.86             \\
+        RMSprop                         & 32 (tf.data configured)  & 0.1126   & 0.0228   & 31.25             \\
+        Stochastic GD                   & 1                        & 0.1061   & 0.0204   & 766.18            \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Part-I Algorithms Comparison (GD, Minibatch SGD, Stochastic GD)}
+% Performance Table for Part I
+\begin{table}[H]
+    \centering
+    \caption{Performance Comparison of Part-I Optimizers}
+    \label{tab:part1_summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        Optimizer     & Batch Size Config        & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        Minibatch SGD & 32 (tf.data configured)  & 0.5654   & 0.5551   & 30.73             \\
+        GD (Batch)    & 21600                    & 0.2056   & 0.1083   & 27.86             \\
+        Stochastic GD & 1                        & 0.1061   & 0.0204   & 766.18            \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+% Plots for Part I (Loss and Accuracy)
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part1_loss_plot.png} % REPLACE with your actual plot file
+    \caption{Training and Validation Loss - Part-I Optimizers}
+    \label{fig:part1_loss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part1_accuracy_plot.png} % REPLACE with your actual plot file
+    \caption{Training and Validation Accuracy - Part-I Optimizers}
+    \label{fig:part1_accuracy}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{part1_barchart.png} % REPLACE with your actual plot file
+    \caption{Performance Bar Chart - Part-I Optimizers}
+    \label{fig:part1_barchart}
+\end{figure}
+\clearpage % Ensure plots don't overflow too much
+
+\subsubsection{Observations for Part-I}
+\begin{itemize}
+    \item \textbf{Minibatch SGD} demonstrated a strong balance of computational efficiency and learning performance, achieving the best results by a large margin. The mini-batches provide a good estimate of the gradient and allow for frequent updates. Training and validation loss showed consistent decrease, and accuracy rose steadily.
+    \item \textbf{GD (Batch)} struggled significantly. With a fixed learning rate of 0.01 and only 15 epochs, it made very slow progress. The loss decreased very slowly and remained high.
+    \item \textbf{Stochastic GD (SGD with batch size 1)} performed the worst. The high variance in gradient estimates led to extremely noisy training (visible in loss and accuracy plots) and very poor generalization. It also incurred the longest total training time.
+\end{itemize}
+
+\subsection{Part-II Algorithms Comparison (Batch GD variants)}
+% Performance Table for Part II
+\begin{table}[H]
+    \centering
+    \caption{Performance Comparison of Part-II Optimizers}
+    \label{tab:part2_summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        Optimizer                       & Batch Size Config   & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        GD with Momentum (Batch)        & 21600               & 0.2735   & 0.2089   & 28.19             \\
+        GD with Nesterov Momentum (Batch) & 21600               & 0.2419   & 0.1490   & 28.03             \\
+        GD (Batch)                      & 21600               & 0.2056   & 0.1083   & 27.86             \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+% Plots for Part II (Loss and Accuracy)
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part2_loss_plot.png} % REPLACE
+    \caption{Training and Validation Loss - Part-II Optimizers}
+    \label{fig:part2_loss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part2_accuracy_plot.png} % REPLACE
+    \caption{Training and Validation Accuracy - Part-II Optimizers}
+    \label{fig:part2_accuracy}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{part2_barchart.png} % REPLACE
+    \caption{Performance Bar Chart - Part-II Optimizers}
+    \label{fig:part2_barchart}
+\end{figure}
+\clearpage
+
+\subsubsection{Observations for Part-II}
+\begin{itemize}
+    \item \textbf{GD with Momentum} provided a noticeable improvement over plain GD (Batch), achieving higher accuracy and F1 score. The momentum term helped accelerate learning.
+    \item \textbf{GD with Nesterov Momentum} also outperformed plain GD (Batch). In this instance, standard momentum performed slightly better than Nesterov.
+    \item All full-batch methods showed slow convergence and somewhat erratic validation curves, indicating that 15 epochs with the given learning rate were insufficient for strong performance on this dataset.
+\end{itemize}
+
+\subsection{Part-III Algorithms Comparison (Adaptive Optimizers)}
+% Performance Table for Part III
+\begin{table}[H]
+    \centering
+    \caption{Performance Comparison of Part-III Optimizers}
+    \label{tab:part3_summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        Optimizer   & Batch Size Config        & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        AdaGrad     & 32 (tf.data configured)  & 0.4828   & 0.4680   & 30.98             \\
+        Adam        & 32 (tf.data configured)  & 0.4509   & 0.4113   & 32.85             \\
+        RMSprop     & 32 (tf.data configured)  & 0.1126   & 0.0228   & 31.25             \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+% Plots for Part III (Loss and Accuracy)
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part3_loss_plot.png} % REPLACE
+    \caption{Training and Validation Loss - Part-III Optimizers}
+    \label{fig:part3_loss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{part3_accuracy_plot.png} % REPLACE
+    \caption{Training and Validation Accuracy - Part-III Optimizers}
+    \label{fig:part3_accuracy}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{part3_barchart.png} % REPLACE
+    \caption{Performance Bar Chart - Part-III Optimizers}
+    \label{fig:part3_barchart}
+\end{figure}
+\clearpage
+
+\subsubsection{Observations for Part-III}
+\begin{itemize}
+    \item \textbf{AdaGrad} performed best among the adaptive optimizers with LR=0.01, showing good convergence in loss and accuracy.
+    \item \textbf{Adam} also performed reasonably well, securing the second spot in this group.
+    \item \textbf{RMSprop} performed unexpectedly poorly. The learning rate of 0.01 is likely too high for RMSprop (which often defaults to 0.001), leading to unstable training as seen by the very high loss and low accuracy.
+\end{itemize}
+
+\subsection{Comparison of Best Algorithms from Each Group}
+Best from Part I: Minibatch SGD (F1: 0.5551) \\
+Best from Part II: GD with Momentum (Batch) (F1: 0.2089) \\
+Best from Part III: AdaGrad (F1: 0.4680)
+
+% Performance Table for Best of Each Group
+\begin{table}[H]
+    \centering
+    \caption{Performance Comparison of Best Optimizer from Each Group}
+    \label{tab:best_of_groups_summary}
+    \begin{tabular}{@{}llrrr@{}}
+        \toprule
+        Optimizer                & Batch Size Config        & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        Minibatch SGD          & 32 (tf.data configured)  & 0.5654   & 0.5551   & 30.73             \\
+        AdaGrad                  & 32 (tf.data configured)  & 0.4828   & 0.4680   & 30.98             \\
+        GD with Momentum (Batch) & 21600                    & 0.2735   & 0.2089   & 28.19             \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+% Plots for Best of Each Group (Loss and Accuracy)
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{best_loss_plot.png} % REPLACE
+    \caption{Training and Validation Loss - Best Optimizer of Each Group}
+    \label{fig:best_loss}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{best_accuracy_plot.png} % REPLACE
+    \caption{Training and Validation Accuracy - Best Optimizer of Each Group}
+    \label{fig:best_accuracy}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\textwidth]{best_barchart.png} % REPLACE
+    \caption{Performance Bar Chart - Best Optimizer of Each Group}
+    \label{fig:best_barchart}
+\end{figure}
+\clearpage
+
+\subsubsection{Observations for Best of Each Group}
+\begin{itemize}
+    \item Minibatch-based optimizers (Minibatch SGD, AdaGrad) significantly outperformed the best full-batch optimizer (GD with Momentum).
+    \item Minibatch SGD was the clear winner among the "champions" of each group, as seen in both the metrics and the learning curves.
+\end{itemize}
+
+
+% --- SECTION 4: FINAL RANKING ---
+\section{Final Ranking of All Algorithms}
+The final ranking of all eight unique optimizer setups, sorted by F1 score (primary) and then accuracy (secondary), is presented below.
+
+\begin{table}[H]
+    \centering
+    \caption{Final Ranking of All Optimizer Setups}
+    \label{tab:final_ranking}
+    \resizebox{\textwidth}{!}{% Resize table to fit page width
+    \begin{tabular}{@{}rllrrr@{}}
+        \toprule
+        Rank & Optimizer                       & Batch Size Config        & Accuracy & F1 Score & Training Time (s) \\ \midrule
+        1 & Minibatch SGD                 & 32 (tf.data configured)  & 0.5654   & 0.5551   & 30.73             \\
+        2 & AdaGrad                         & 32 (tf.data configured)  & 0.4828   & 0.4680   & 30.98             \\
+        3 & Adam                            & 32 (tf.data configured)  & 0.4509   & 0.4113   & 32.85             \\
+        4 & GD with Momentum (Batch)        & 21600                    & 0.2735   & 0.2089   & 28.19             \\
+        5 & GD with Nesterov Momentum (Batch) & 21600                    & 0.2419   & 0.1490   & 28.03             \\
+        6 & GD (Batch)                      & 21600                    & 0.2056   & 0.1083   & 27.86             \\
+        7 & RMSprop                         & 32 (tf.data configured)  & 0.1126   & 0.0228   & 31.25             \\
+        8 & Stochastic GD                   & 1                        & 0.1061   & 0.0204   & 766.18            \\ \bottomrule
+    \end{tabular}
+    } % end resizebox
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{overall_barchart.png} % REPLACE
+    \caption{Overall Optimizer Performance Ranking Bar Chart}
+    \label{fig:overall_barchart}
+\end{figure}
+\clearpage
+
+% --- SECTION 5: CONCLUSION ---
+\section{Conclusion}
+This study systematically compared the performance of eight optimization algorithm setups on the EuroSAT image classification task using a simple MLP.
+
+\begin{itemize}
+    \item \textbf{Key Findings:}
+    \begin{itemize}
+        \item \textbf{Minibatch SGD} emerged as the top-performing optimizer, achieving the highest F1 score (0.555) and accuracy (0.565). Its balance of gradient accuracy from mini-batches and frequent updates proved highly effective.
+        \item Adaptive mini-batch optimizers \textbf{AdaGrad} and \textbf{Adam} also performed well, securing the 2nd and 3rd ranks, respectively.
+        \item Full-batch methods (\textbf{GD (Batch)}, \textbf{GD with Momentum}, \textbf{GD with Nesterov Momentum}) significantly underperformed the mini-batch methods within the 15-epoch limit.
+        \item \textbf{RMSprop} performed very poorly with the common learning rate of 0.01, highlighting its sensitivity to this hyperparameter.
+        \item \textbf{Stochastic GD (batch size 1)} was the least effective and by far the slowest in terms of total training time.
+    \end{itemize}
+    \item \textbf{Impact of Batch Size:} The results clearly indicate the advantage of using mini-batches over full-batches or stochastic updates for this problem, especially with a limited number of epochs.
+    \item \textbf{Learning Rate Sensitivity:} The experiment demonstrated that adaptive optimizers like RMSprop can be highly sensitive if the chosen common learning rate is far from their optimal range.
+    \item \textbf{Future Work:} Further experiments could involve tuning learning rates individually for each optimizer, exploring learning rate schedules, increasing the number of epochs, or using a slightly more complex network (like a simple CNN).
+\end{itemize}
+In conclusion, the choice of optimization algorithm, along with appropriate hyperparameter settings, critically influences the training dynamics and final performance of a neural network. For the EuroSAT dataset with a simple MLP and limited epochs, Minibatch SGD provided the best results among the tested configurations.
+
+\end{document}
